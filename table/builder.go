@@ -27,19 +27,24 @@ import (
 )
 
 var (
+	// 在一个block中其实还会有多个段进行存储，每一个段中可以共享prefix内容
+	// 但是这个段的长度一般都是基于key的个数
 	restartInterval = 100 // Might want to change this to be based on total size instead of numKeys.
 )
 
 func newBuffer(sz int) *bytes.Buffer {
+	// new 一个buffer
 	b := new(bytes.Buffer)
+	// 初始化buffer的大小
 	b.Grow(sz)
 	return b
 }
 
+// header的大小是默认的
 type header struct {
-	plen uint16 // Overlap with base key.
-	klen uint16 // Length of the diff.
-	vlen uint16 // Length of value.
+	plen uint16 // Overlap with base key.重叠部分的key长度
+	klen uint16 // Length of the diff.表示key不同部分的长度也就是suffix的长度
+	vlen uint16 // Length of value.value的长度大小
 	prev uint32 // Offset for the previous key-value pair. The offset is relative to block base offset.
 }
 
@@ -64,6 +69,8 @@ func (h *header) Decode(buf []byte) int {
 func (h header) Size() int { return 10 }
 
 // Builder is used in building a table.
+// Builder的作用是用来构建table
+// 内部实现了构建一个block的方法
 type Builder struct {
 	counter int // Number of keys written for the current block.
 

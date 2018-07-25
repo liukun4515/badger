@@ -44,6 +44,7 @@ type keyOffset struct {
 }
 
 // Table represents a loaded table file with the info we have about it
+// 表示一个table或者文件的信息，
 type Table struct {
 	sync.Mutex
 
@@ -94,6 +95,8 @@ func (t *Table) DecrRef() error {
 	return nil
 }
 
+// 描述一个block的信息
+// 就是为了帮助iterator block的信息
 type block struct {
 	offset int
 	data   []byte
@@ -336,28 +339,33 @@ func (t *Table) ID() uint64 { return t.id }
 func (t *Table) DoesNotHave(key []byte) bool { return !t.bf.Has(key) }
 
 // ParseFileID reads the file id out of a filename.
+// 通过文件名字，得到文件的id
 func ParseFileID(name string) (uint64, bool) {
 	name = path.Base(name)
 	if !strings.HasSuffix(name, fileSuffix) {
 		return 0, false
 	}
-	//	suffix := name[len(fileSuffix):]
+	// suffix := name[len(fileSuffix):]
+	// 去掉name中的suffix内容
 	name = strings.TrimSuffix(name, fileSuffix)
 	id, err := strconv.Atoi(name)
 	if err != nil {
 		return 0, false
 	}
+	// 文件的名字必须大于等于0
 	y.AssertTrue(id >= 0)
 	return uint64(id), true
 }
 
 // IDToFilename does the inverse of ParseFileID
+// 通过文件id获得文件名字
 func IDToFilename(id uint64) string {
 	return fmt.Sprintf("%06d", id) + fileSuffix
 }
 
 // NewFilename should be named TableFilepath -- it combines the dir with the ID to make a table
 // filepath.
+// 文件名字需要dir+filename
 func NewFilename(id uint64, dir string) string {
 	return filepath.Join(dir, IDToFilename(id))
 }

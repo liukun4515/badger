@@ -30,6 +30,7 @@ const (
 
 // Arena should be lock-free.
 type Arena struct {
+	// 申请一个小的区域
 	n   uint32
 	buf []byte
 }

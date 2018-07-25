@@ -461,6 +461,7 @@ type Entry struct {
 	Meta            byte
 	UserMeta        byte
 	Value           []byte
+	// compare and set 比较
 	CASCounterCheck uint64 // If nonzero, we will check if existing casCounter matches.
 	Error           error  // Error if any.
 
@@ -505,6 +506,7 @@ func (e Entry) print(prefix string) {
 		prefix, e.Key, e.Meta, e.UserMeta, e.offset, len(e.Value), e.casCounter, e.CASCounterCheck)
 }
 
+// 描述一个header的信息部分
 type header struct {
 	klen            uint32
 	vlen            uint32
@@ -529,6 +531,7 @@ func (h header) Encode(out []byte) {
 }
 
 // Decodes h from buf.
+// byte size is 26
 func (h *header) Decode(buf []byte) {
 	h.klen = binary.BigEndian.Uint32(buf[0:4])
 	h.vlen = binary.BigEndian.Uint32(buf[4:8])

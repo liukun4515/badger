@@ -21,5 +21,6 @@ package y
 import "syscall"
 
 func init() {
+	// 同步模式
 	datasyncFileFlag = syscall.O_SYNC
 }

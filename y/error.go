@@ -37,6 +37,8 @@ import (
 
 var debugMode = true
 
+// 主要是用来处理error信息的类
+
 // Check logs fatal if err != nil.
 func Check(err error) {
 	if err != nil {
@@ -52,6 +54,7 @@ func Check2(_ interface{}, err error) {
 // AssertTrue asserts that b is true. Otherwise, it would log fatal.
 func AssertTrue(b bool) {
 	if !b {
+		// 这个的意思就是output并且exit
 		log.Fatalf("%+v", errors.Errorf("Assert failed"))
 	}
 }

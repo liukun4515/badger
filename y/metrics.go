@@ -52,6 +52,7 @@ var (
 
 // These variables are global and have cumulative values for all kv stores.
 func init() {
+	// 所有new的东西都会被publish出去
 	NumReads = expvar.NewInt("badger_disk_reads_total")
 	NumWrites = expvar.NewInt("badger_disk_writes_total")
 	NumBytesRead = expvar.NewInt("badger_read_bytes")
@@ -62,7 +63,11 @@ func init() {
 	NumPuts = expvar.NewInt("badger_puts_total")
 	NumBlockedPuts = expvar.NewInt("badger_blocked_puts_total")
 	NumMemtableGets = expvar.NewInt("badger_memtable_gets_total")
+
+	// map结构，应该表示的每个层次或者文件的大小
 	LSMSize = expvar.NewMap("badger_lsm_size_bytes")
+	// vlog应该表示的value log文件的大小
 	VlogSize = expvar.NewMap("badger_vlog_size_bytes")
+	// 被pending的write的数据
 	PendingWrites = expvar.NewMap("badger_pending_writes_total")
 }

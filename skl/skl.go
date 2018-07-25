@@ -30,6 +30,9 @@ Key differences:
 - We combine the findLessThan, findGreaterOrEqual, etc into one function.
 */
 
+// 这里和rocksdb的区别在于其对应的key，没有sequence number
+//
+
 package skl
 
 import (
@@ -455,6 +458,8 @@ func (s *Iterator) SeekToLast() {
 // UniIterator is a unidirectional memtable iterator. It is a thin wrapper around
 // Iterator. We like to keep Iterator as before, because it is more powerful and
 // we might support bidirectional iterators in the future.
+
+// 目前只是一个单项的链表，仅仅只能支持advance retreat
 type UniIterator struct {
 	iter     *Iterator
 	reversed bool

@@ -96,6 +96,8 @@ const (
 )
 
 // NewKV returns a new KV object.
+// 创建一个kv 对象
+// 根据option
 func NewKV(optParam *Options) (out *KV, err error) {
 	// Make a copy early and fill in maxBatchSize
 	opt := *optParam
@@ -909,6 +911,7 @@ func (s *KV) SetIfAbsentAsync(key, val []byte, userMeta byte, f func(error)) err
 
 // EntriesSet adds a Set to the list of entries.
 // Exposing this so that user does not have to specify the Entry directly.
+// 构建一个entry slice
 func EntriesSet(s []*Entry, key, val []byte) []*Entry {
 	return append(s, &Entry{
 		Key:   key,
@@ -983,6 +986,7 @@ func (s *KV) DeleteAsync(key []byte, f func(error)) {
 }
 
 // EntriesDelete adds a Del to the list of entries.
+// 构建一个delete的entry
 func EntriesDelete(s []*Entry, key []byte) []*Entry {
 	return append(s, &Entry{
 		Key:  key,

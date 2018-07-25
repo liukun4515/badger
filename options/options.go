@@ -21,6 +21,7 @@ package options
 type FileLoadingMode int
 
 const (
+	// 文件load的模式
 	// FileIO indicates that files must be loaded using standard I/O
 	FileIO FileLoadingMode = iota
 	// LoadToRAM indicates that file must be loaded into RAM

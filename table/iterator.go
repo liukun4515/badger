@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// block的迭代器
 type blockIterator struct {
 	data    []byte
 	pos     uint32
@@ -190,6 +191,8 @@ func (itr *blockIterator) Value() []byte {
 }
 
 // Iterator is an iterator for a Table.
+// table的迭代器
+// 其中保存一个table的struct以及block的iterator的内容
 type Iterator struct {
 	t    *Table
 	bpos int

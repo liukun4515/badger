@@ -109,17 +109,21 @@ type Closer struct {
 
 // NewCloser constructs a new Closer, with an initial count on the WaitGroup.
 func NewCloser(initial int) *Closer {
+	// 创建一个阻塞的channel
 	ret := &Closer{closed: make(chan struct{})}
+	// 初始化一个wait的大小
 	ret.waiting.Add(initial)
 	return ret
 }
 
 // AddRunning Add()'s delta to the WaitGroup.
+// 增加run的个数
 func (lc *Closer) AddRunning(delta int) {
 	lc.waiting.Add(delta)
 }
 
 // Signal signals the HasBeenClosed signal.
+// 信号量通知
 func (lc *Closer) Signal() {
 	close(lc.closed)
 }
@@ -130,6 +134,7 @@ func (lc *Closer) HasBeenClosed() <-chan struct{} {
 }
 
 // Done calls Done() on the WaitGroup.
+// 每次done一次就减少一个
 func (lc *Closer) Done() {
 	lc.waiting.Done()
 }
