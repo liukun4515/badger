@@ -42,10 +42,12 @@ import (
 // reconstruct the manifest at startup.
 type Manifest struct {
 	Levels []LevelManifest
+	// 某个文件table id对应的level信息
 	Tables map[uint64]TableManifest
 
 	// Contains total number of creation and deletion changes in the manifest -- used to compute
 	// whether it'd be useful to rewrite the manifest.
+	// 统计信息，用来表示是否需要重写manifest文件
 	Creations int
 	Deletions int
 }
@@ -61,17 +63,20 @@ func createManifest() Manifest {
 // LevelManifest contains information about LSM tree levels
 // in the MANIFEST file.
 type LevelManifest struct {
+	// 表示某一个level下的table id集合
 	Tables map[uint64]struct{} // Set of table id's
 }
 
 // TableManifest contains information about a specific level
 // in the LSM tree.
+// 代表了某个level
 type TableManifest struct {
 	Level uint8
 }
 
 // manifestFile holds the file pointer (and other info) about the manifest file, which is a log
 // file we append to.
+// manifest文件的描述信息
 type manifestFile struct {
 	fp        *os.File
 	directory string
@@ -79,9 +84,11 @@ type manifestFile struct {
 	deletionsRewriteThreshold int
 
 	// Guards appends, which includes access to the manifest field.
+	// 并发控制的锁内容
 	appendLock sync.Mutex
 
 	// Used to track the current state of the manifest, used when rewriting.
+	// 用来重写一个db的操作的文件
 	manifest Manifest
 }
 
@@ -95,14 +102,17 @@ const (
 
 // asChanges returns a sequence of changes that could be used to recreate the Manifest in its
 // present state.
+// 把manifest中的内容判断抽取出来成日志
 func (m *Manifest) asChanges() []*protos.ManifestChange {
 	changes := make([]*protos.ManifestChange, 0, len(m.Tables))
 	for id, tm := range m.Tables {
+		// 每一个create change都是新的对象或者结构体
 		changes = append(changes, makeTableCreateChange(id, int(tm.Level)))
 	}
 	return changes
 }
 
+// 深度copy
 func (m *Manifest) clone() Manifest {
 	changeSet := protos.ManifestChangeSet{Changes: m.asChanges()}
 	ret := createManifest()
@@ -117,44 +127,55 @@ func openOrCreateManifestFile(dir string) (ret *manifestFile, result Manifest, e
 }
 
 func helpOpenOrCreateManifestFile(dir string, deletionsThreshold int) (ret *manifestFile, result Manifest, err error) {
+	// 查看文件是否存在
 	path := filepath.Join(dir, ManifestFilename)
 	fp, err := y.OpenExistingSyncedFile(path, false) // We explicitly sync in addChanges, outside the lock.
+	// 出现错误的情况，有两种，一种是文件出现了损坏
+	// 一种是文件不存在，也就是manifest 文件不存在
+	// 文件不存在的可能有两种：1是没有manifest文件 2是没有manifest文件但是有rewrite manifest文件
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, Manifest{}, err
 		}
+		// 文件已经存在，也就是manifest file已经存在
+		// 开始的是m是空的
 		m := createManifest()
 		fp, netCreations, err := helpRewrite(dir, &m)
 		if err != nil {
 			return nil, Manifest{}, err
 		}
+		// 确保文件数量为0
 		y.AssertTrue(netCreations == 0)
+		// ？？？？很不明白为什么这里需要一个deep copy
 		mf := &manifestFile{
 			fp:                        fp,
 			directory:                 dir,
+			// manifestFile中存储的是m的deep copy
 			manifest:                  m.clone(),
 			deletionsRewriteThreshold: deletionsThreshold,
 		}
 		return mf, m, nil
 	}
-
+	// 如果文件已经存在，并且没有错我的内容，就需要replay manifest的信息
+	// 如果manifest文件已经存在就replay这个文件
 	manifest, truncOffset, err := ReplayManifestFile(fp)
 	if err != nil {
 		_ = fp.Close()
 		return nil, Manifest{}, err
 	}
 
+	// replay 完以及后需要truncate一部分信息
 	// Truncate file so we don't have a half-written entry at the end.
 	if err := fp.Truncate(truncOffset); err != nil {
 		_ = fp.Close()
 		return nil, Manifest{}, err
 	}
-
+	// seek到文件尾部
 	if _, err = fp.Seek(0, os.SEEK_END); err != nil {
 		_ = fp.Close()
 		return nil, Manifest{}, err
 	}
-
+	// 返回对应的结果
 	mf := &manifestFile{
 		fp:                        fp,
 		directory:                 dir,
@@ -168,7 +189,7 @@ func (mf *manifestFile) close() error {
 	return mf.fp.Close()
 }
 
-// addChanges writes a batch of changes, atomically, to the file.  By "atomically" that means when
+// addChanges writes a batch of changes, atomically, to the file. By "atomically" that means when
 // we replay the MANIFEST file, we'll either replay all the changes or none of them.  (The truth of
 // this depends on the filesystem -- some might append garbage data if a system crash happens at
 // the wrong time.)
@@ -180,6 +201,7 @@ func (mf *manifestFile) addChanges(changesParam []*protos.ManifestChange) error 
 	}
 
 	// Maybe we could use O_APPEND instead (on certain file systems)
+	// 把修改内容 apply到manifest file中
 	mf.appendLock.Lock()
 	if err := applyChangeSet(&mf.manifest, &changes); err != nil {
 		mf.appendLock.Unlock()
@@ -213,6 +235,10 @@ var magicText = [4]byte{'B', 'd', 'g', 'r'}
 // The magic version number.
 const magicVersion = 2
 
+// 这个方法的作用，就是在dir目录下写一个manifestRewriteFilename文件，内容是根据manifest信息
+// 如果m是空的话也会写一部分信息（每一个信息包含entry：crc+data内容）
+// 最后再把manifestRewriteFilename重命名为ManifestFilename
+// 返回的int表示m中文件的数量
 func helpRewrite(dir string, m *Manifest) (*os.File, int, error) {
 	rewritePath := filepath.Join(dir, manifestRewriteFilename)
 	// We explicitly sync.
@@ -221,10 +247,11 @@ func helpRewrite(dir string, m *Manifest) (*os.File, int, error) {
 		return nil, 0, err
 	}
 
+	// 写 magic信息
 	buf := make([]byte, 8)
 	copy(buf[0:4], magicText[:])
 	binary.BigEndian.PutUint32(buf[4:8], magicVersion)
-
+	// m是空的
 	netCreations := len(m.Tables)
 	changes := m.asChanges()
 	set := protos.ManifestChangeSet{Changes: changes}
@@ -234,10 +261,13 @@ func helpRewrite(dir string, m *Manifest) (*os.File, int, error) {
 		fp.Close()
 		return nil, 0, err
 	}
+	// crc校验
 	var lenCrcBuf [8]byte
 	binary.BigEndian.PutUint32(lenCrcBuf[0:4], uint32(len(changeBuf)))
 	binary.BigEndian.PutUint32(lenCrcBuf[4:8], crc32.Checksum(changeBuf, y.CastagnoliCrcTable))
+	// crc校验信息
 	buf = append(buf, lenCrcBuf[:]...)
+	// 数据信息
 	buf = append(buf, changeBuf...)
 	if _, err := fp.Write(buf); err != nil {
 		fp.Close()
@@ -252,10 +282,12 @@ func helpRewrite(dir string, m *Manifest) (*os.File, int, error) {
 	if err = fp.Close(); err != nil {
 		return nil, 0, err
 	}
+	// rename rewrite到原始名字
 	manifestPath := filepath.Join(dir, ManifestFilename)
 	if err := os.Rename(rewritePath, manifestPath); err != nil {
 		return nil, 0, err
 	}
+	// 打开文件
 	fp, err = y.OpenExistingSyncedFile(manifestPath, false)
 	if err != nil {
 		return nil, 0, err
@@ -321,12 +353,15 @@ func ReplayManifestFile(fp *os.File) (ret Manifest, truncOffset int64, err error
 	r := countingReader{wrapped: bufio.NewReader(fp)}
 
 	var magicBuf [8]byte
+	// 读取magic buff
 	if _, err := io.ReadFull(&r, magicBuf[:]); err != nil {
 		return Manifest{}, 0, errBadMagic
 	}
+	// 比较内容
 	if bytes.Compare(magicBuf[0:4], magicText[:]) != 0 {
 		return Manifest{}, 0, errBadMagic
 	}
+	//
 	version := binary.BigEndian.Uint32(magicBuf[4:8])
 	if version != magicVersion {
 		return Manifest{}, 0,
@@ -342,19 +377,25 @@ func ReplayManifestFile(fp *os.File) (ret Manifest, truncOffset int64, err error
 		_, err := io.ReadFull(&r, lenCrcBuf[:])
 		if err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				// 如果文件读完
 				break
 			}
+			// 返回error
 			return Manifest{}, 0, err
 		}
 		length := binary.BigEndian.Uint32(lenCrcBuf[0:4])
 		var buf = make([]byte, length)
+
 		if _, err := io.ReadFull(&r, buf); err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				// 文件读错误
 				break
 			}
+			// 返回error
 			return Manifest{}, 0, err
 		}
 		if crc32.Checksum(buf, y.CastagnoliCrcTable) != binary.BigEndian.Uint32(lenCrcBuf[4:8]) {
+			// checksum出了问题
 			break
 		}
 
@@ -410,6 +451,7 @@ func applyChangeSet(build *Manifest, changeSet *protos.ManifestChangeSet) error 
 	return nil
 }
 
+// 生成一个新文件的change信息
 func makeTableCreateChange(id uint64, level int) *protos.ManifestChange {
 	return &protos.ManifestChange{
 		Id:    id,
@@ -418,6 +460,7 @@ func makeTableCreateChange(id uint64, level int) *protos.ManifestChange {
 	}
 }
 
+// 生成一个删除文件的信息的操作
 func makeTableDeleteChange(id uint64) *protos.ManifestChange {
 	return &protos.ManifestChange{
 		Id: id,

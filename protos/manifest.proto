@@ -25,11 +25,15 @@ message ManifestChangeSet {
 }
 
 message ManifestChange {
+        // 文件id
         uint64 Id = 1;
+        // 对这个文件的操作类型
         enum Operation {
                 CREATE = 0;
                 DELETE = 1;
         }
+        // 存在的操作类型
         Operation Op = 2;
+        // 文件所属于的等级
         uint32 Level = 3;  // Only used for CREATE
 }
